@@ -1253,7 +1253,7 @@ const EXAM_CONFIG = {
             await updateGitHubFile(set.filePath, pdfBase64, `Admin: Update ${set.setName} PDF file`, token);
             set.isNewUpload = false;
             set.fileObj = null;
-            s.sizeStr = 'Saved file';
+            set.sizeStr = 'Saved file';
           }
         }
 
