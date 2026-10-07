@@ -419,6 +419,7 @@
         placeholder="Enter password…"
         autocomplete="off"
         spellcheck="false"
+        autofocus
       />
     </div>
 
@@ -557,9 +558,22 @@ function setError(msg) {
 
 // Login button + Enter key
 document.getElementById('btn-enter').addEventListener('click', attemptLogin);
-document.getElementById('pwd-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') attemptLogin();
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const loginScreen = document.getElementById('login-screen');
+    if (loginScreen && getComputedStyle(loginScreen).display !== 'none') {
+      e.preventDefault();
+      attemptLogin();
+    }
+  }
 });
+
+// Auto-focus password input on load
+setTimeout(() => {
+  const pwd = document.getElementById('pwd-input');
+  if (pwd) pwd.focus();
+}, 100);
 
 // Auto-restore session (refresh stays logged in for the session)
 if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
