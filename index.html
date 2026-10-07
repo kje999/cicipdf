@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <!-- Title is set dynamically from config.js -->
+  <title>Exam Viewer</title>
+
+  <style>
+    /* ── RESET & BASE ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #11111b;
+      color: #cdd6f4;
+      /* Global: prevent text selection & dragging */
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+    }
+
+    /* ── PRINT BLOCK ──────────────────────────────────────────────────────── */
+    @media print {
+      body * { display: none !important; }
+      body::after {
+        content: "Printing is not allowed for this exam.";
+        display: block !important;
+        text-align: center;
+        padding-top: 120px;
+        font-size: 2rem;
+        font-family: sans-serif;
+        color: #cc0000;
+      }
+    }
+
+
+    /* ════════════════════════════════════════════════════════════
+       LOGIN SCREEN
+    ════════════════════════════════════════════════════════════ */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1e1e2e 0%, #181825 50%, #11111b 100%);
+    }
+
+    .login-card {
+      background: rgba(30, 30, 46, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(205, 214, 244, 0.1);
+      border-radius: 20px;
+      padding: 52px 44px;
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    .login-icon {
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 24px;
+      background: linear-gradient(135deg, #cba6f7, #89b4fa);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      box-shadow: 0 8px 24px rgba(203, 166, 247, 0.35);
+    }
+
+    .login-exam-title {
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: #cdd6f4;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .login-institution {
+      font-size: 0.9rem;
+      color: rgba(205, 214, 244, 0.45);
+      margin-bottom: 36px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: rgba(205, 214, 244, 0.4);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .form-group input[type="password"] {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(205, 214, 244, 0.12);
+      border-radius: 10px;
+      color: #cdd6f4;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      /* Allow typing in the password field */
+      user-select: text;
+      -webkit-user-select: text;
+      -moz-user-select: text;
+    }
+
+    .form-group input[type="password"]:focus {
+      border-color: #cba6f7;
+      box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.15);
+    }
+
+    .form-group input[type="password"].input-error {
+      border-color: #f38ba8;
+      animation: shake 0.45s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    #btn-enter {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #cba6f7, #89b4fa);
+      border: none;
+      border-radius: 10px;
+      color: #11111b;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+      margin-top: 10px;
+      letter-spacing: 0.01em;
+    }
+
+    #btn-enter:hover:not(:disabled) {
+      opacity: 0.92;
+      box-shadow: 0 6px 20px rgba(203, 166, 247, 0.4);
+    }
+
+    #btn-enter:active:not(:disabled) { transform: scale(0.98); }
+
+    #btn-enter:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    #error-msg {
+      min-height: 22px;
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #f38ba8;
+      text-align: center;
+    }
+
+
+    /* ════════════════════════════════════════════════════════════
+       VIEWER SCREEN
+    ════════════════════════════════════════════════════════════ */
+    #viewer-screen {
+      display: none; /* shown after auth */
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── TOOLBAR ──────────────────────────────────────────────────────────── */
+    .toolbar {
+      flex-shrink: 0;
+      background: #1e1e2e;
+      border-bottom: 1px solid rgba(205, 214, 244, 0.08);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+      gap: 12px;
+    }
+
+    .toolbar-left {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .toolbar-exam-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #cdd6f4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toolbar-institution {
+      font-size: 0.72rem;
+      color: rgba(205, 214, 244, 0.35);
+      white-space: nowrap;
+    }
+
+    .toolbar-center {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .page-btn {
+      background: rgba(205, 214, 244, 0.07);
+      border: 1px solid rgba(205, 214, 244, 0.12);
+      border-radius: 7px;
+      color: #cdd6f4;
+      padding: 6px 16px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      background: rgba(205, 214, 244, 0.14);
+    }
+
+    .page-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    #page-info {
+      font-size: 0.82rem;
+      color: rgba(205, 214, 244, 0.5);
+      min-width: 82px;
+      text-align: center;
+    }
+
+    .toolbar-right { flex-shrink: 0; }
+
+    .security-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: rgba(243, 139, 168, 0.1);
+      border: 1px solid rgba(243, 139, 168, 0.25);
+      border-radius: 20px;
+      font-size: 0.73rem;
+      font-weight: 600;
+      color: #f38ba8;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ── PDF CONTAINER ────────────────────────────────────────────────────── */
+    #pdf-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: #0e0e1a;
+      padding: 36px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    #pdf-container::-webkit-scrollbar { width: 7px; }
+    #pdf-container::-webkit-scrollbar-track { background: transparent; }
+    #pdf-container::-webkit-scrollbar-thumb {
+      background: rgba(205, 214, 244, 0.12);
+      border-radius: 4px;
+    }
+    #pdf-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(205, 214, 244, 0.22);
+    }
+
+    .page-wrapper {
+      position: relative;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255,255,255,0.04);
+      border-radius: 3px;
+      overflow: hidden; /* clips watermark overflow */
+      flex-shrink: 0;
+    }
+
+    .page-wrapper canvas {
+      display: block;
+      /* Scale to fit viewport width on smaller screens */
+      max-width: min(900px, 96vw);
+      height: auto;
+    }
+
+    /* Page skeleton shown while rendering */
+    .page-skeleton {
+      width: min(900px, 96vw);
+      aspect-ratio: 210 / 297; /* A4 default; overridden by JS */
+      background: linear-gradient(90deg, #1e1e2e 25%, #252535 50%, #1e1e2e 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      color: rgba(205, 214, 244, 0.25);
+    }
+
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* ── LOADING OVERLAY (initial) ────────────────────────────────────────── */
+    #loading-overlay {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 20px;
+      color: rgba(205, 214, 244, 0.4);
+      gap: 18px;
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(203, 166, 247, 0.15);
+      border-top-color: #cba6f7;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TAB-SWITCH WARNING OVERLAY ───────────────────────────────────────── */
+    #tab-warning {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.97);
+      z-index: 9999;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      text-align: center;
+      padding: 32px;
+    }
+
+    #tab-warning.active { display: flex; }
+
+    .warning-icon { font-size: 64px; line-height: 1; }
+
+    .warning-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #f38ba8;
+      letter-spacing: -0.02em;
+    }
+
+    .warning-msg {
+      color: rgba(205, 214, 244, 0.5);
+      max-width: 400px;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .warning-counter {
+      font-size: 0.8rem;
+      color: rgba(243, 139, 168, 0.6);
+    }
+
+    #btn-resume {
+      padding: 13px 40px;
+      background: #f38ba8;
+      border: none;
+      border-radius: 10px;
+      color: #11111b;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.2s;
+    }
+
+    #btn-resume:hover { opacity: 0.88; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-icon">🔒</div>
+    <h1 class="login-exam-title" id="ui-exam-title">Practical Examination</h1>
+    <p class="login-institution" id="ui-institution">Enter the access password to view the exam.</p>
+
+    <div class="form-group">
+      <label for="pwd-input">Access Password</label>
+      <input
+        type="password"
+        id="pwd-input"
+        placeholder="Enter password…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+
+    <button id="btn-enter">Unlock Exam</button>
+    <p id="error-msg"></p>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     VIEWER SCREEN
+══════════════════════════════════════ -->
+<div id="viewer-screen">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="toolbar-exam-title" id="viewer-exam-title">Practical Examination</span>
+      <span class="toolbar-institution" id="viewer-institution">Institution</span>
+    </div>
+
+    <div class="toolbar-center">
+      <button class="page-btn" id="btn-prev" disabled>◀ Prev</button>
+      <span id="page-info">Loading…</span>
+      <button class="page-btn" id="btn-next" disabled>Next ▶</button>
+    </div>
+
+    <div class="toolbar-right">
+      <div class="security-badge">🔐 Secured View</div>
+    </div>
+  </div>
+
+  <div id="pdf-container">
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <span>Loading exam, please wait…</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     TAB-SWITCH WARNING OVERLAY
+══════════════════════════════════════ -->
+<div id="tab-warning">
+  <div class="warning-icon">⚠️</div>
+  <div class="warning-title">Tab Switch Detected</div>
+  <p class="warning-msg">
+    You navigated away from the exam window.<br/>
+    Stay on this page for the duration of your exam.
+  </p>
+  <p class="warning-counter" id="switch-counter"></p>
+  <button id="btn-resume">Return to Exam</button>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     SCRIPTS — order matters!
+══════════════════════════════════════ -->
+<!-- 1. Config (must come first) -->
+<script src="config.js"></script>
+
+<!-- 2. PDF.js from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+        integrity="sha512-q+4lsF0nhP68GhfDh7iJw5fMQX0XMazNE0D4DLsqjWFmLheJHBBVMlHYwc2Zxri4ojY+MuBp7dkOUXTTJLNQ=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   EXAM VIEWER — MAIN SCRIPT
+   All logic is here. config.js drives passwords, PDF path, etc.
+══════════════════════════════════════════════════════════════ */
+
+// ── PDF.js worker ──────────────────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── Session key (auth persists for the browser session) ───────────────────
+const SESSION_KEY = 'examviewer_auth';
+
+// ── Apply config values to UI ─────────────────────────────────────────────
+document.title                                    = EXAM_CONFIG.examTitle;
+document.getElementById('ui-exam-title').textContent    = EXAM_CONFIG.examTitle;
+document.getElementById('ui-institution').textContent   = EXAM_CONFIG.institutionName;
+document.getElementById('viewer-exam-title').textContent = EXAM_CONFIG.examTitle;
+document.getElementById('viewer-institution').textContent = EXAM_CONFIG.institutionName;
+
+
+/* ══════════════════════════════════════
+   AUTH — PASSWORD GATE
+══════════════════════════════════════ */
+let failedAttempts = 0;
+let lockUntil      = 0;
+
+function attemptLogin() {
+  const now = Date.now();
+
+  // Enforce lockout
+  if (now < lockUntil) {
+    const secs = Math.ceil((lockUntil - now) / 1000);
+    setError(`Too many failed attempts. Please wait ${secs} second(s).`);
+    return;
+  }
+
+  const input = document.getElementById('pwd-input').value;
+
+  if (input === EXAM_CONFIG.password) {
+    // Correct — store session and show viewer
+    sessionStorage.setItem(SESSION_KEY, 'ok');
+    showViewer();
+  } else {
+    failedAttempts++;
+    // Shake animation
+    const pwdEl = document.getElementById('pwd-input');
+    pwdEl.classList.add('input-error');
+    pwdEl.value = '';
+    setTimeout(() => pwdEl.classList.remove('input-error'), 500);
+
+    if (failedAttempts >= 3) {
+      lockUntil = Date.now() + 60_000; // 60-second lock
+      setError('Too many incorrect attempts. Locked for 60 seconds.');
+      document.getElementById('btn-enter').disabled = true;
+      // Re-enable after lockout expires
+      setTimeout(() => {
+        failedAttempts = 0;
+        lockUntil = 0;
+        document.getElementById('btn-enter').disabled = false;
+        setError('');
+      }, 60_000);
+    } else {
+      const remaining = 3 - failedAttempts;
+      setError(`Incorrect password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`);
+    }
+  }
+}
+
+function setError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+}
+
+// Login button + Enter key
+document.getElementById('btn-enter').addEventListener('click', attemptLogin);
+document.getElementById('pwd-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') attemptLogin();
+});
+
+// Auto-restore session (refresh stays logged in for the session)
+if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
+  showViewer();
+}
+
+
+/* ══════════════════════════════════════
+   VIEWER — SHOW & INIT
+══════════════════════════════════════ */
+function showViewer() {
+  document.getElementById('login-screen').style.display = 'none';
+  const vs = document.getElementById('viewer-screen');
+  vs.style.display = 'flex';
+  setupSecurity();
+  loadPDF();
+}
+
+
+/* ══════════════════════════════════════
+   PDF LOADING & RENDERING
+══════════════════════════════════════ */
+let pdfDoc      = null;
+let totalPages  = 0;
+let currentPage = 1;
+
+// Render at high DPI for crispness; 1.8× is a good balance of quality vs. speed
+const RENDER_SCALE = window.devicePixelRatio >= 2 ? 2.0 : 1.8;
+
+async function loadPDF() {
+  try {
+    const loadingTask = pdfjsLib.getDocument(EXAM_CONFIG.pdfFile);
+    pdfDoc      = await loadingTask.promise;
+    totalPages  = pdfDoc.numPages;
+    currentPage = 1;
+
+    // Remove the spinner
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.remove();
+
+    // Render pages progressively (page 1 first, then the rest)
+    for (let i = 1; i <= totalPages; i++) {
+      await renderPage(i);
+    }
+
+    updatePageInfo();
+    updateNavButtons();
+
+    // Watch scroll to update page indicator
+    setupScrollObserver();
+
+  } catch (err) {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      overlay.innerHTML = `
+        <span style="font-size:2rem;">⚠️</span>
+        <span style="color:#f38ba8; font-size:0.95rem;">
+          Failed to load the exam file.<br/>
+          Please contact your instructor.
+        </span>`;
+    }
+    console.error('PDF load error:', err);
+  }
+}
+
+async function renderPage(pageNum) {
+  const page     = await pdfDoc.getPage(pageNum);
+  const viewport = page.getViewport({ scale: RENDER_SCALE });
+
+  const wrapper  = document.createElement('div');
+  wrapper.className = 'page-wrapper';
+  wrapper.id        = `page-${pageNum}`;
+  wrapper.dataset.page = pageNum;
+
+  const canvas   = document.createElement('canvas');
+  canvas.width   = viewport.width;
+  canvas.height  = viewport.height;
+  // CSS width controls display size; height is auto-scaled
+  canvas.style.width = `${viewport.width / RENDER_SCALE}px`;
+
+  const ctx = canvas.getContext('2d');
+
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Stamp watermark on top of the rendered pixels
+  if (EXAM_CONFIG.watermarkText) {
+    applyWatermark(ctx, viewport.width, viewport.height);
+  }
+
+  wrapper.appendChild(canvas);
+  document.getElementById('pdf-container').appendChild(wrapper);
+}
+
+function applyWatermark(ctx, w, h) {
+  const fontSize = Math.round(w / 10);
+  ctx.save();
+  ctx.globalAlpha     = 0.07;
+  ctx.fillStyle       = '#cc0000';
+  ctx.font            = `bold ${fontSize}px sans-serif`;
+  ctx.textAlign       = 'center';
+  ctx.textBaseline    = 'middle';
+
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(-Math.PI / 6); // 30° diagonal
+
+  const lineHeight = fontSize * 2.4;
+  for (let y = -h * 1.5; y < h * 1.5; y += lineHeight) {
+    ctx.fillText(EXAM_CONFIG.watermarkText, 0, y);
+  }
+  ctx.restore();
+}
+
+
+/* ══════════════════════════════════════
+   PAGE NAVIGATION
+══════════════════════════════════════ */
+function updatePageInfo() {
+  document.getElementById('page-info').textContent = `Page ${currentPage} / ${totalPages}`;
+}
+
+function updateNavButtons() {
+  document.getElementById('btn-prev').disabled = currentPage <= 1;
+  document.getElementById('btn-next').disabled = currentPage >= totalPages;
+}
+
+document.getElementById('btn-prev').addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage--;
+    scrollToPage(currentPage);
+    updatePageInfo();
+    updateNavButtons();
+  }
+});
+
+document.getElementById('btn-next').addEventListener('click', () => {
+  if (currentPage < totalPages) {
+    currentPage++;
+    scrollToPage(currentPage);
+    updatePageInfo();
+    updateNavButtons();
+  }
+});
+
+function scrollToPage(n) {
+  const el = document.getElementById(`page-${n}`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Update current-page indicator as the user scrolls
+function setupScrollObserver() {
+  const options = {
+    root: document.getElementById('pdf-container'),
+    threshold: 0.3,
+  };
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const n = parseInt(entry.target.dataset.page, 10);
+        if (n && n !== currentPage) {
+          currentPage = n;
+          updatePageInfo();
+          updateNavButtons();
+        }
+      }
+    });
+  }, options);
+
+  document.querySelectorAll('.page-wrapper').forEach(el => observer.observe(el));
+}
+
+
+/* ══════════════════════════════════════
+   SECURITY MEASURES
+══════════════════════════════════════ */
+function setupSecurity() {
+
+  // 1. Block right-click context menu
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  // 2. Block clipboard events
+  document.addEventListener('copy',  e => e.preventDefault());
+  document.addEventListener('cut',   e => e.preventDefault());
+  document.addEventListener('paste', e => e.preventDefault());
+
+  // 3. Block drag-and-drop (can expose canvas content)
+  document.addEventListener('dragstart', e => e.preventDefault());
+
+  // 4. Block keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    const ctrl = e.ctrlKey || e.metaKey;
+
+    const blockedCtrl = ['c','x','u','a','p','s'].includes(e.key.toLowerCase());
+    const devtools    = e.key === 'F12' ||
+                        (ctrl && e.shiftKey && ['i','j','c','k'].includes(e.key.toLowerCase()));
+    const printScreen = e.key === 'PrintScreen';
+
+    if ((ctrl && blockedCtrl) || devtools || printScreen) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
+  // 5. Tab / window-switch detection
+  if (EXAM_CONFIG.detectTabSwitch) {
+    let switchCount = 0;
+
+    function triggerWarning() {
+      switchCount++;
+      document.getElementById('switch-counter').textContent =
+        `Tab/window switch count this session: ${switchCount}`;
+      document.getElementById('tab-warning').classList.add('active');
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) triggerWarning();
+    });
+
+    window.addEventListener('blur', triggerWarning);
+  }
+}
+
+// Resume from tab-switch overlay
+document.getElementById('btn-resume').addEventListener('click', () => {
+  document.getElementById('tab-warning').classList.remove('active');
+  window.focus();
+});
+</script>
+</body>
+</html>

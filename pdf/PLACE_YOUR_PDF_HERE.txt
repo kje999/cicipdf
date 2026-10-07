@@ -1,0 +1,11 @@
+Place your PDF exam file here.
+
+Rename it to  exam.pdf  (or update pdfFile in config.js to match your filename).
+
+Example:
+  - File you copy here:  midterm2025.pdf
+  - Setting in config.js:  pdfFile: "pdf/midterm2025.pdf"
+
+IMPORTANT:
+  Do NOT rename or delete this folder.
+  The viewer will look for the PDF inside  pdf/
