@@ -517,8 +517,10 @@
 <!-- ══════════════════════════════════════
      SCRIPTS — order matters!
 ══════════════════════════════════════ -->
-<!-- 1. Config (must come first) -->
-<script src="config.js?v=2"></script>
+<!-- 1. Config (must come first, cache-busted) -->
+<script>
+  document.write('<script src="config.js?_t=' + Date.now() + '"><\/script>');
+</script>
 
 <!-- 2. PDF.js from CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -563,8 +565,8 @@ function attemptLogin() {
   const input = document.getElementById('pwd-input').value;
 
   if (input === EXAM_CONFIG.password) {
-    // Correct — store session and show viewer
-    sessionStorage.setItem(SESSION_KEY, 'ok');
+    // Correct — store authenticated password in session and show viewer
+    sessionStorage.setItem(SESSION_KEY, input);
     showViewer();
   } else {
     failedAttempts++;
@@ -609,6 +611,13 @@ window.addEventListener('keydown', e => {
   }
 });
 
+// Check if a previous auto-logout notice was saved
+const savedLogoutNotice = sessionStorage.getItem('exam_logout_notice');
+if (savedLogoutNotice) {
+  sessionStorage.removeItem('exam_logout_notice');
+  setError(savedLogoutNotice);
+}
+
 // Check if exam is currently closed / not yet available
 if (EXAM_CONFIG.isExamActive === false) {
   sessionStorage.removeItem(SESSION_KEY);
@@ -639,9 +648,16 @@ if (EXAM_CONFIG.isExamActive === false) {
     if (pwd) pwd.focus();
   }, 100);
 
-  // Auto-restore session (refresh stays logged in for the session)
-  if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
-    showViewer();
+  // Auto-restore session ONLY if saved password matches CURRENT config
+  const savedSession = sessionStorage.getItem(SESSION_KEY);
+  if (savedSession) {
+    if (savedSession === EXAM_CONFIG.password) {
+      showViewer();
+    } else {
+      // Outdated session (password was changed)
+      sessionStorage.removeItem(SESSION_KEY);
+      setError('⚠️ The exam password has changed. Please enter the new password.');
+    }
   }
 }
 
@@ -655,6 +671,49 @@ function showViewer() {
   vs.style.display = 'flex';
   setupSecurity();
   loadPDF();
+  startSessionWatcher();
+}
+
+
+/* ══════════════════════════════════════
+   LIVE SESSION WATCHER (AUTO-LOGOUT)
+══════════════════════════════════════ */
+let sessionWatcherTimer = null;
+
+function startSessionWatcher() {
+  if (sessionWatcherTimer) clearInterval(sessionWatcherTimer);
+
+  sessionWatcherTimer = setInterval(async () => {
+    const currentPass = sessionStorage.getItem(SESSION_KEY);
+    if (!currentPass) {
+      clearInterval(sessionWatcherTimer);
+      return;
+    }
+
+    try {
+      const res = await fetch(`config.js?_t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+
+      const text = await res.text();
+      const pwdMatch = text.match(/password:\s*["']([^"']+)["']/);
+      const activeMatch = text.match(/isExamActive:\s*(true|false)/);
+
+      const latestPassword = pwdMatch ? pwdMatch[1] : null;
+      const isStillActive = activeMatch ? activeMatch[1] === 'true' : true;
+
+      if (!isStillActive || (latestPassword && latestPassword !== currentPass)) {
+        clearInterval(sessionWatcherTimer);
+        sessionStorage.removeItem(SESSION_KEY);
+        const reason = !isStillActive
+          ? '⏳ The exam was closed by the instructor. You have been logged out.'
+          : '⚠️ The exam password was updated by the instructor. You have been logged out.';
+        sessionStorage.setItem('exam_logout_notice', reason);
+        window.location.reload();
+      }
+    } catch (err) {
+      // Silently ignore network hiccups so temporary glitches do not kick students out
+    }
+  }, 15000); // Polls every 15 seconds
 }
 
 
