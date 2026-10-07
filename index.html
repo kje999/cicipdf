@@ -398,6 +398,33 @@
     }
 
     #btn-resume:hover { opacity: 0.88; }
+
+    /* ── ANTI-SCREENSHOT MOUSE-LEAVE BLUR ────────────────────────── */
+    #pdf-container.security-blurred {
+      filter: blur(28px) grayscale(60%);
+      opacity: 0.12;
+      pointer-events: none;
+      transition: filter 0.08s ease, opacity 0.08s ease;
+    }
+
+    #blur-notice {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(14, 14, 26, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      z-index: 9998;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px;
+      gap: 14px;
+      pointer-events: none;
+    }
+
+    #blur-notice.active { display: flex; }
   </style>
 </head>
 <body>
@@ -456,6 +483,19 @@
       <span>Loading exam, please wait…</span>
     </div>
   </div>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     MOUSE-LEAVE BLUR NOTICE
+══════════════════════════════════════ -->
+<div id="blur-notice">
+  <div style="font-size: 52px; line-height: 1;">🛡️</div>
+  <div style="font-size: 1.5rem; font-weight: 800; color: #f38ba8;">Exam Content Protected</div>
+  <p style="color: rgba(205, 214, 244, 0.65); max-width: 440px; font-size: 0.95rem; line-height: 1.5;">
+    Your mouse cursor left the exam window.<br/>
+    Move your cursor back inside this window to view the exam.
+  </p>
 </div>
 
 
@@ -833,6 +873,25 @@ function setupSecurity() {
     });
 
     window.addEventListener('blur', triggerWarning);
+  }
+
+  // 6. Anti-Screenshot: Blur on Mouse Leave
+  if (r.blurOnMouseLeave !== false) {
+    const pdfCont = document.getElementById('pdf-container');
+    const blurNotice = document.getElementById('blur-notice');
+
+    document.documentElement.addEventListener('mouseleave', () => {
+      const tabWarn = document.getElementById('tab-warning');
+      if (tabWarn && tabWarn.classList.contains('active')) return;
+
+      if (pdfCont) pdfCont.classList.add('security-blurred');
+      if (blurNotice) blurNotice.classList.add('active');
+    });
+
+    document.documentElement.addEventListener('mouseenter', () => {
+      if (pdfCont) pdfCont.classList.remove('security-blurred');
+      if (blurNotice) blurNotice.classList.remove('active');
+    });
   }
 }
 

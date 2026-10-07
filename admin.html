@@ -522,7 +522,19 @@
       </label>
     </div>
 
-    <!-- Toggle 6: Watermark -->
+    <!-- Toggle 6: Mouse Leave Anti-Screenshot Blur -->
+    <div class="restriction-item">
+      <div class="restriction-info">
+        <div class="restriction-title">👁️ Anti-Screenshot: Blur When Mouse Leaves Window</div>
+        <div class="restriction-sub">Instantly blurs and shields the exam when the mouse moves outside the window (blocks Snipping Tool clicks and dual-monitor cheating).</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="res-mouseblur" checked />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- Toggle 7: Watermark -->
     <div class="restriction-item">
       <div class="restriction-info">
         <div class="restriction-title">💧 Diagonal Watermark on Pages</div>
@@ -606,6 +618,7 @@
   const resTextSelect     = document.getElementById('res-textselect');
   const resShortcuts      = document.getElementById('res-shortcuts');
   const resTabSwitch      = document.getElementById('res-tabswitch');
+  const resMouseBlur      = document.getElementById('res-mouseblur');
   const resWatermark      = document.getElementById('res-watermark');
 
   const fileInput         = document.getElementById('file-input');
@@ -670,6 +683,7 @@
     resTextSelect.checked  = r.blockTextSelection !== false;
     resShortcuts.checked   = r.blockShortcuts !== false;
     resTabSwitch.checked   = r.detectTabSwitch !== undefined ? r.detectTabSwitch : (EXAM_CONFIG.detectTabSwitch !== false);
+    resMouseBlur.checked   = r.blurOnMouseLeave !== false;
     resWatermark.checked   = r.enableWatermark !== false;
     groupWatermark.style.display = resWatermark.checked ? 'block' : 'none';
   } else {
@@ -816,6 +830,7 @@
       blockTextSelection: resTextSelect.checked,
       blockShortcuts:     resShortcuts.checked,
       detectTabSwitch:    resTabSwitch.checked,
+      blurOnMouseLeave:   resMouseBlur.checked,
       enableWatermark:    resWatermark.checked,
     };
 
@@ -860,6 +875,7 @@ const EXAM_CONFIG = {
     blockTextSelection: ${restrictions.blockTextSelection},
     blockShortcuts:     ${restrictions.blockShortcuts},
     detectTabSwitch:    ${restrictions.detectTabSwitch},
+    blurOnMouseLeave:   ${restrictions.blurOnMouseLeave},
     enableWatermark:    ${restrictions.enableWatermark},
   },
   watermarkText: ${JSON.stringify(watermark)},
