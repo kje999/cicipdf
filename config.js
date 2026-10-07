@@ -7,6 +7,7 @@ const EXAM_CONFIG = {
   isExamActive: false,
   closedMessage: "The practical exam is not yet available. Please wait for your instructor to open the exam.",
   password: "prac2026",
+  adminPassword: "tubol69",
   pdfFile: "pdf/exam.pdf",
   examTitle: "Web Systems Technology - Practical Exam",
   institutionName: "ISUFST",

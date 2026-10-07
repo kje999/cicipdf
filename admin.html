@@ -369,20 +369,107 @@
       color: #c4b5fd;
       text-decoration: underline;
     }
+
+    /* Admin Auth Gate Screen */
+    #admin-gate-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      position: fixed;
+      inset: 0;
+      background: #0f111a;
+      z-index: 10000;
+    }
+
+    .admin-gate-card {
+      background: #181b26;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 44px 36px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    .admin-gate-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    .admin-gate-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-bottom: 8px;
+    }
+
+    .admin-gate-desc {
+      color: #94a3b8;
+      font-size: 0.88rem;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .btn-logout-admin {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-logout-admin:hover {
+      background: rgba(239, 68, 68, 0.22);
+      color: #f87171;
+    }
   </style>
 </head>
-<body>
+<!-- ══════════════════════════════════════
+     ADMIN AUTHENTICATION GATE
+══════════════════════════════════════ -->
+<div id="admin-gate-screen">
+  <div class="admin-gate-card">
+    <div class="admin-gate-icon">🔐</div>
+    <h2 class="admin-gate-title">Admin Dashboard</h2>
+    <p class="admin-gate-desc">Please enter the administrator password to manage exam settings and security.</p>
 
-<div class="container">
+    <div class="form-group" style="text-align:left;">
+      <label class="form-label" for="admin-auth-pass">Admin Password</label>
+      <input type="password" id="admin-auth-pass" placeholder="Enter admin password…" autocomplete="off" autofocus />
+    </div>
+
+    <button class="btn-submit" id="btn-admin-login" style="margin-top:8px;">
+      <span>🔓 Unlock Dashboard</span>
+    </button>
+    <p id="admin-login-error" style="color:#f87171; font-size:0.88rem; margin-top:14px; min-height:1.2rem;"></p>
+  </div>
+</div>
+
+<div class="container" id="admin-dashboard-container" style="display:none;">
   
   <div class="header">
     <div class="header-title">
       <h1>Exam Admin Dashboard</h1>
       <span class="badge-admin">Admin</span>
     </div>
-    <a href="index.html" target="_blank" class="btn-view-exam">
-      <span>👁️ View Student Exam</span> ↗
-    </a>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <a href="index.html" target="_blank" class="btn-view-exam">
+        <span>👁️ View Student Exam</span> ↗
+      </a>
+      <button type="button" class="btn-logout-admin" id="btn-admin-logout" title="Lock Dashboard">
+        <span>🔒 Log Out</span>
+      </button>
+    </div>
   </div>
 
   <!-- 1. Destination Mode & GitHub Connection Card -->
@@ -480,6 +567,18 @@
     <div class="form-group">
       <label class="form-label">School / Department Name</label>
       <input type="text" id="cfg-institution" placeholder="e.g. ISUFST" />
+    </div>
+  </div>
+
+  <!-- 3b. Admin Authentication Password Card -->
+  <div class="card" style="border-left: 4px solid #cba6f7;">
+    <div class="card-title">🔑 3b. Admin Dashboard Password</div>
+    <div class="card-desc">Change the password required to open and modify this Admin Dashboard.</div>
+
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Administrator Password</label>
+      <input type="text" id="cfg-admin-password" placeholder="Default: tubol69" />
+      <div class="form-help">Instructors must type this password to access this admin panel. (Default: <code>tubol69</code>)</div>
     </div>
   </div>
 
@@ -615,8 +714,10 @@
 
 </div>
 
-<!-- Load current config -->
-<script src="config.js?v=2"></script>
+<!-- Load current config (cache-busted) -->
+<script>
+  document.write('<script src="config.js?_t=' + Date.now() + '"><\/script>');
+</script>
 
 <script>
   // Repo configuration
@@ -640,11 +741,71 @@
   const statusText        = document.getElementById('status-text');
   const availCard         = document.getElementById('availability-card');
 
-  const passwordInput     = document.getElementById('cfg-password');
-  const titleInput        = document.getElementById('cfg-title');
-  const institutionInput  = document.getElementById('cfg-institution');
-  const watermarkInput    = document.getElementById('cfg-watermark');
-  const groupWatermark    = document.getElementById('group-watermark-text');
+  const passwordInput      = document.getElementById('cfg-password');
+  const adminPasswordInput = document.getElementById('cfg-admin-password');
+  const titleInput         = document.getElementById('cfg-title');
+  const institutionInput   = document.getElementById('cfg-institution');
+  const watermarkInput     = document.getElementById('cfg-watermark');
+  const groupWatermark     = document.getElementById('group-watermark-text');
+
+  // Admin Auth Gate elements
+  const adminGateScreen = document.getElementById('admin-gate-screen');
+  const adminDashboard  = document.getElementById('admin-dashboard-container');
+  const adminAuthPass   = document.getElementById('admin-auth-pass');
+  const btnAdminLogin   = document.getElementById('btn-admin-login');
+  const adminLoginError = document.getElementById('admin-login-error');
+  const btnAdminLogout  = document.getElementById('btn-admin-logout');
+
+  const ADMIN_SESSION_KEY = 'exam_admin_auth_session';
+
+  function verifyAdminAuth() {
+    const expectedPass = (typeof EXAM_CONFIG !== 'undefined' && EXAM_CONFIG.adminPassword) ? EXAM_CONFIG.adminPassword : 'tubol69';
+    const currentSession = sessionStorage.getItem(ADMIN_SESSION_KEY);
+
+    if (currentSession === expectedPass) {
+      adminGateScreen.style.display = 'none';
+      adminDashboard.style.display = 'block';
+    } else {
+      adminGateScreen.style.display = 'flex';
+      adminDashboard.style.display = 'none';
+      setTimeout(() => { if (adminAuthPass) adminAuthPass.focus(); }, 100);
+    }
+  }
+
+  function handleAdminLogin() {
+    const input = (adminAuthPass.value || '').trim();
+    const expectedPass = (typeof EXAM_CONFIG !== 'undefined' && EXAM_CONFIG.adminPassword) ? EXAM_CONFIG.adminPassword : 'tubol69';
+
+    if (input === expectedPass) {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, input);
+      adminLoginError.textContent = '';
+      adminAuthPass.value = '';
+      verifyAdminAuth();
+    } else {
+      adminLoginError.textContent = '❌ Incorrect administrator password.';
+      adminAuthPass.classList.add('input-error');
+      adminAuthPass.value = '';
+      setTimeout(() => adminAuthPass.classList.remove('input-error'), 400);
+    }
+  }
+
+  if (btnAdminLogin) {
+    btnAdminLogin.addEventListener('click', handleAdminLogin);
+  }
+  if (adminAuthPass) {
+    adminAuthPass.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleAdminLogin();
+    });
+  }
+  if (btnAdminLogout) {
+    btnAdminLogout.addEventListener('click', () => {
+      sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      verifyAdminAuth();
+    });
+  }
+
+  // Initial check
+  verifyAdminAuth();
 
   // Restriction toggles
   const resRightClick     = document.getElementById('res-rightclick');
@@ -739,10 +900,11 @@
     closedMsgInput.value   = EXAM_CONFIG.closedMessage || 'The practical exam is not yet available. Please wait for your instructor to open the exam.';
     updateStatusDisplay(activeInput.checked);
 
-    passwordInput.value    = EXAM_CONFIG.password || '';
-    titleInput.value       = EXAM_CONFIG.examTitle || '';
-    institutionInput.value = EXAM_CONFIG.institutionName || '';
-    watermarkInput.value   = EXAM_CONFIG.watermarkText || '';
+    passwordInput.value      = EXAM_CONFIG.password || '';
+    adminPasswordInput.value = EXAM_CONFIG.adminPassword || 'tubol69';
+    titleInput.value         = EXAM_CONFIG.examTitle || '';
+    institutionInput.value   = EXAM_CONFIG.institutionName || '';
+    watermarkInput.value     = EXAM_CONFIG.watermarkText || '';
 
     // Restrictions
     const r = EXAM_CONFIG.restrictions || {};
@@ -888,10 +1050,11 @@
 
     const isExamActive = activeInput.checked;
     const closedMsg    = closedMsgInput.value.trim() || 'The practical exam is not yet available. Please wait for your instructor to open the exam.';
-    const password     = passwordInput.value.trim();
-    const title        = titleInput.value.trim() || 'Practical Examination';
-    const institution  = institutionInput.value.trim() || '';
-    const watermark    = watermarkInput.value.trim();
+    const password      = passwordInput.value.trim();
+    const adminPassword = (adminPasswordInput.value || '').trim() || 'tubol69';
+    const title         = titleInput.value.trim() || 'Practical Examination';
+    const institution   = institutionInput.value.trim() || '';
+    const watermark     = watermarkInput.value.trim();
 
     // Restrictions
     const restrictions = {
@@ -907,6 +1070,12 @@
     if (!password) {
       showStatus('⚠️ Please specify an access password.', 'error');
       passwordInput.focus();
+      return;
+    }
+
+    if (!adminPassword) {
+      showStatus('⚠️ Please specify an admin password.', 'error');
+      adminPasswordInput.focus();
       return;
     }
 
@@ -927,6 +1096,7 @@ const EXAM_CONFIG = {
   isExamActive: ${isExamActive},
   closedMessage: ${JSON.stringify(closedMsg)},
   password: ${JSON.stringify(password)},
+  adminPassword: ${JSON.stringify(adminPassword)},
   pdfFile: "pdf/exam.pdf",
   examTitle: ${JSON.stringify(title)},
   institutionName: ${JSON.stringify(institution)},
@@ -995,6 +1165,12 @@ const EXAM_CONFIG = {
             👉 Click here to test your updated exam
           </a>
         `, 'success');
+      }
+
+      // Update session and in-memory config with newly saved admin password
+      sessionStorage.setItem(ADMIN_SESSION_KEY, adminPassword);
+      if (typeof EXAM_CONFIG !== 'undefined') {
+        EXAM_CONFIG.adminPassword = adminPassword;
       }
 
       selectedPdfFile = null;
