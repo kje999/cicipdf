@@ -472,7 +472,10 @@
       <button class="page-btn" id="btn-next" disabled>Next ▶</button>
     </div>
 
-    <div class="toolbar-right">
+    <div class="toolbar-right" style="display:flex; align-items:center; gap:8px;">
+      <div id="set-badge" style="display:none; padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; background:rgba(203,166,247,0.18); border:1px solid rgba(203,166,247,0.35); color:#cba6f7;">
+        📄 <span id="set-badge-label">Set A</span>
+      </div>
       <div class="security-badge">🔐 Secured View</div>
     </div>
   </div>
@@ -727,6 +730,38 @@ let currentPage = 1;
 // Render at high DPI for crispness; 1.8× is a good balance of quality vs. speed
 const RENDER_SCALE = window.devicePixelRatio >= 2 ? 2.0 : 1.8;
 
+// Persistent device-locked set assignment (Survives browser close/reopen)
+const LOCAL_SET_STORAGE_KEY = 'examviewer_assigned_set';
+
+function resolveAssignedExam() {
+  // If examSets array exists and has entries, use multi-set logic
+  if (Array.isArray(EXAM_CONFIG.examSets) && EXAM_CONFIG.examSets.length > 0) {
+    const sets = EXAM_CONFIG.examSets.filter(s => s && s.filePath);
+    if (sets.length > 0) {
+      // Check if student already got assigned a set on this device
+      const savedSetId = localStorage.getItem(LOCAL_SET_STORAGE_KEY);
+      const existingMatch = sets.find(s => s.id === savedSetId);
+
+      if (existingMatch) {
+        return existingMatch;
+      }
+
+      // First time on this device: pick a random set and lock it in localStorage
+      const randomIndex = Math.floor(Math.random() * sets.length);
+      const chosen = sets[randomIndex];
+      localStorage.setItem(LOCAL_SET_STORAGE_KEY, chosen.id);
+      return chosen;
+    }
+  }
+
+  // Fallback to single pdfFile if no sets defined
+  return {
+    id: 'default',
+    setName: '',
+    filePath: EXAM_CONFIG.pdfFile || 'pdf/exam.pdf'
+  };
+}
+
 async function loadPDF(retryCount = 0) {
   const container = document.getElementById('pdf-container');
   // Ensure loading overlay is present
@@ -752,8 +787,22 @@ async function loadPDF(retryCount = 0) {
       throw new Error('PDF viewer library is still loading. Please check your internet connection.');
     }
 
-    // 2. Cache-busting URL to prevent browser 304/stale partial cache issues
-    const pdfUrl = EXAM_CONFIG.pdfFile + (EXAM_CONFIG.pdfFile.includes('?') ? '&' : '?') + '_t=' + Date.now();
+    // 2. Resolve assigned PDF (Single or Multi-Set with persistent localStorage assignment)
+    const assigned = resolveAssignedExam();
+    const pdfPath  = assigned.filePath;
+    const pdfUrl   = pdfPath + (pdfPath.includes('?') ? '&' : '?') + '_t=' + Date.now();
+
+    // Update set badge in toolbar if multi-set is active
+    const setBadge = document.getElementById('set-badge');
+    const setBadgeLabel = document.getElementById('set-badge-label');
+    if (setBadge && setBadgeLabel) {
+      if (assigned.setName) {
+        setBadgeLabel.textContent = assigned.setName;
+        setBadge.style.display = 'block';
+      } else {
+        setBadge.style.display = 'none';
+      }
+    }
 
     const loadingTask = pdfjsLib.getDocument({
       url: pdfUrl,

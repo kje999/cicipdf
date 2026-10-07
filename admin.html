@@ -679,30 +679,25 @@
     </div>
   </div>
 
-  <!-- 5. PDF Upload Card -->
-  <div class="card">
-    <div class="card-title">📄 5. Exam PDF File</div>
-    <div class="card-desc">
-      Upload a new PDF question sheet, or leave as is to keep the current one.
-    </div>
-
-    <div class="file-dropzone" id="dropzone">
-      <input type="file" id="file-input" accept="application/pdf" />
-      <div class="file-dropzone-icon">📁</div>
-      <div class="file-dropzone-text">Click or drag & drop a PDF file here</div>
-      <div class="file-dropzone-sub">Accepts .pdf files only</div>
-    </div>
-
-    <div class="file-preview" id="file-preview">
-      <div class="file-preview-info">
-        <span style="font-size: 1.3rem;">📄</span>
-        <div>
-          <div class="file-preview-name" id="preview-name">exam.pdf</div>
-          <div class="file-preview-size" id="preview-size">0 KB</div>
-        </div>
+  <!-- 5. Exam PDF Files & Multi-Set Distribution Card -->
+  <div class="card" id="card-pdf-sets">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div class="card-title">📄 5. Exam Question Sheets & Multi-Sets</div>
+        <div class="card-desc" style="margin-bottom:0;">Upload single exam or multiple sets (Set A, Set B, etc.) for random, device-locked student distribution.</div>
       </div>
-      <button type="button" id="btn-remove-file" style="background:none; border:none; color:#f87171; cursor:pointer; font-size:1.1rem;">✕</button>
+      <button type="button" id="btn-add-set" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:7px 14px; border-radius:8px; font-weight:700; font-size:0.82rem; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+        ➕ Add Exam Set
+      </button>
     </div>
+
+    <!-- Mode description helper -->
+    <div id="sets-helper-box" style="margin-top:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; font-size:0.8rem; color:#94a3b8; line-height:1.5;">
+      💡 <b>Random Device-Locked Distribution:</b> When multiple sets are added, students entering the password are automatically and randomly assigned a set. Their assignment is locked into their browser so <b>even if they accidentally close or refresh the browser, they will always receive the exact same question set</b>.
+    </div>
+
+    <!-- Dynamic Sets Container -->
+    <div id="sets-list-container" style="margin-top:16px; display:flex; flex-direction:column; gap:12px;"></div>
   </div>
 
   <!-- Submit Button -->
@@ -816,17 +811,128 @@
   const resMouseBlur      = document.getElementById('res-mouseblur');
   const resWatermark      = document.getElementById('res-watermark');
 
-  const fileInput         = document.getElementById('file-input');
-  const dropzone          = document.getElementById('dropzone');
-  const filePreview       = document.getElementById('file-preview');
-  const previewName       = document.getElementById('preview-name');
-  const previewSize       = document.getElementById('preview-size');
-  const btnRemoveFile     = document.getElementById('btn-remove-file');
-
   const btnSave           = document.getElementById('btn-save');
   const statusBox         = document.getElementById('status-box');
 
-  let selectedPdfFile = null;
+  // Multi-Set State & Management
+  const setsListContainer = document.getElementById('sets-list-container');
+  const btnAddSet         = document.getElementById('btn-add-set');
+
+  // examSets holds the list of sets: { id, setName, filePath, fileObj, isNewUpload, sizeStr }
+  let examSets = [];
+
+  function initExamSetsFromConfig() {
+    examSets = [];
+    if (typeof EXAM_CONFIG !== 'undefined' && Array.isArray(EXAM_CONFIG.examSets) && EXAM_CONFIG.examSets.length > 0) {
+      examSets = EXAM_CONFIG.examSets.map(s => ({
+        id: s.id || ('set_' + Math.random().toString(36).substr(2, 6)),
+        setName: s.setName || 'Set A',
+        filePath: s.filePath || 'pdf/exam.pdf',
+        fileObj: null,
+        isNewUpload: false,
+        sizeStr: 'Saved file'
+      }));
+    } else {
+      // Default initial set pointing to current exam.pdf
+      const defaultPdf = (typeof EXAM_CONFIG !== 'undefined' && EXAM_CONFIG.pdfFile) ? EXAM_CONFIG.pdfFile : 'pdf/exam.pdf';
+      examSets = [
+        { id: 'set_a', setName: 'Set A', filePath: defaultPdf, fileObj: null, isNewUpload: false, sizeStr: 'Current active PDF' }
+      ];
+    }
+    renderSetsUI();
+  }
+
+  function renderSetsUI() {
+    setsListContainer.innerHTML = '';
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+    examSets.forEach((set, index) => {
+      const setCard = document.createElement('div');
+      setCard.style.cssText = 'background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:12px;';
+
+      const defaultLetter = letters[index] || (index + 1);
+      const isRemovable = examSets.length > 1;
+
+      setCard.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.1rem;">📄</span>
+            <input type="text" class="set-name-input" data-index="${index}" value="${escapeHtml(set.setName || ('Set ' + defaultLetter))}" 
+                   style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:6px; color:#f1f5f9; padding:4px 10px; font-weight:700; font-size:0.9rem; width:140px;" placeholder="Set Name" />
+            <span style="font-size:0.75rem; color:#94a3b8;">(${set.filePath || 'pdf/exam.pdf'})</span>
+          </div>
+          ${isRemovable ? `<button type="button" class="btn-remove-set" data-index="${index}" style="background:none; border:none; color:#f87171; cursor:pointer; font-size:0.85rem; font-weight:600; padding:4px 8px;">✕ Remove Set</button>` : ''}
+        </div>
+
+        <div style="display:flex; align-items:center; gap:12px; background:rgba(0,0,0,0.25); border:1px dashed rgba(255,255,255,0.15); border-radius:8px; padding:10px 14px;">
+          <label style="background:rgba(139,92,246,0.2); border:1px solid rgba(139,92,246,0.4); color:#c4b5fd; padding:6px 14px; border-radius:6px; font-size:0.8rem; font-weight:700; cursor:pointer;">
+            📁 ${set.isNewUpload ? 'Replace PDF' : 'Upload / Replace PDF'}
+            <input type="file" class="set-file-input" data-index="${index}" accept="application/pdf" style="display:none;" />
+          </label>
+          <div style="font-size:0.82rem; color:${set.isNewUpload ? '#86efac' : '#cbd5e1'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${set.isNewUpload ? `✅ <b>${escapeHtml(set.fileObj.name)}</b> (${set.sizeStr})` : `📄 <b>${escapeHtml(set.filePath.split('/').pop())}</b> (${set.sizeStr})`}
+          </div>
+        </div>
+      `;
+
+      setsListContainer.appendChild(setCard);
+    });
+
+    // Bind event listeners
+    setsListContainer.querySelectorAll('.set-name-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        examSets[idx].setName = e.target.value.trim();
+      });
+    });
+
+    setsListContainer.querySelectorAll('.btn-remove-set').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        examSets.splice(idx, 1);
+        renderSetsUI();
+      });
+    });
+
+    setsListContainer.querySelectorAll('.set-file-input').forEach(fileInput => {
+      fileInput.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        if (e.target.files && e.target.files[0]) {
+          const f = e.target.files[0];
+          examSets[idx].fileObj = f;
+          examSets[idx].isNewUpload = true;
+          examSets[idx].sizeStr = `${(f.size / 1024).toFixed(1)} KB (Ready)`;
+          // Auto generate path name based on index or set name
+          const safeLetter = letters[idx] ? letters[idx].toLowerCase() : (idx + 1);
+          examSets[idx].filePath = `pdf/exam_set_${safeLetter}.pdf`;
+          renderSetsUI();
+        }
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+  }
+
+  if (btnAddSet) {
+    btnAddSet.addEventListener('click', () => {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const nextIdx = examSets.length;
+      const nextLetter = letters[nextIdx] || (nextIdx + 1);
+      const safeId = 'set_' + nextLetter.toString().toLowerCase();
+
+      examSets.push({
+        id: safeId,
+        setName: `Set ${nextLetter}`,
+        filePath: `pdf/exam_set_${nextLetter.toString().toLowerCase()}.pdf`,
+        fileObj: null,
+        isNewUpload: false,
+        sizeStr: 'Please upload PDF'
+      });
+      renderSetsUI();
+    });
+  }
 
   // Toggle visual status display
   function updateStatusDisplay(isActive) {
@@ -916,54 +1022,11 @@
     resMouseBlur.checked   = r.blurOnMouseLeave !== false;
     resWatermark.checked   = r.enableWatermark !== false;
     groupWatermark.style.display = resWatermark.checked ? 'block' : 'none';
+    initExamSetsFromConfig();
   } else {
     updateStatusDisplay(true);
+    initExamSetsFromConfig();
   }
-
-  // 2. File selection handlers
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleSelectedFile(e.target.files[0]);
-    }
-  });
-
-  ['dragenter', 'dragover'].forEach(name => {
-    dropzone.addEventListener(name, (e) => {
-      e.preventDefault();
-      dropzone.classList.add('dragover');
-    });
-  });
-
-  ['dragleave', 'drop'].forEach(name => {
-    dropzone.addEventListener(name, (e) => {
-      e.preventDefault();
-      dropzone.classList.remove('dragover');
-    });
-  });
-
-  dropzone.addEventListener('drop', (e) => {
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const f = e.dataTransfer.files[0];
-      if (f.type === 'application/pdf' || f.name.endsWith('.pdf')) {
-        handleSelectedFile(f);
-      } else {
-        showStatus('Please upload a valid PDF file.', 'error');
-      }
-    }
-  });
-
-  function handleSelectedFile(file) {
-    selectedPdfFile = file;
-    previewName.textContent = file.name;
-    previewSize.textContent = `${(file.size / 1024).toFixed(1)} KB (Ready to upload)`;
-    filePreview.style.display = 'flex';
-  }
-
-  btnRemoveFile.addEventListener('click', () => {
-    selectedPdfFile = null;
-    fileInput.value = '';
-    filePreview.style.display = 'none';
-  });
 
   function showStatus(msg, type) {
     statusBox.className = type;
@@ -971,7 +1034,7 @@
     statusBox.style.display = 'block';
   }
 
-  // 3. Helper: Read File as Base64
+  // Helper: Read File as Base64
   function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -989,7 +1052,7 @@
     return btoa(unescape(encodeURIComponent(str)));
   }
 
-  // 4. Helper: Get GitHub File SHA
+  // Helper: Get GitHub File SHA
   async function getFileSha(path, token) {
     const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
     const res = await fetch(url, {
@@ -1005,7 +1068,7 @@
     return null;
   }
 
-  // 5. Helper: Commit / Update GitHub File
+  // Helper: Commit / Update GitHub File
   async function updateGitHubFile(path, contentBase64, commitMessage, token) {
     const sha = await getFileSha(path, token);
     const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${path}`;
@@ -1037,7 +1100,7 @@
     return await res.json();
   }
 
-  // 6. Save & Publish Action
+  // Save & Publish Action
   btnSave.addEventListener('click', async () => {
     const isLocalMode = modeLocal.checked;
     const token = tokenInput.value.trim();
@@ -1079,6 +1142,12 @@
       return;
     }
 
+    // Validate that at least one exam set is present
+    if (!examSets || examSets.length === 0) {
+      showStatus('⚠️ Please add at least one exam set.', 'error');
+      return;
+    }
+
     if (!isLocalMode) {
       // Save token in browser storage
       localStorage.setItem('exam_admin_token', token);
@@ -1087,6 +1156,16 @@
     btnSave.disabled = true;
 
     try {
+      // Build clean examSets config array
+      const configSets = examSets.map(s => ({
+        id: s.id,
+        setName: s.setName,
+        filePath: s.filePath
+      }));
+
+      // Default single fallback points to first set
+      const defaultPdf = configSets[0].filePath || 'pdf/exam.pdf';
+
       const newConfigContent = `/**
  * EXAM VIEWER — CONFIGURATION FILE
  * Auto-updated via Admin Dashboard
@@ -1097,7 +1176,8 @@ const EXAM_CONFIG = {
   closedMessage: ${JSON.stringify(closedMsg)},
   password: ${JSON.stringify(password)},
   adminPassword: ${JSON.stringify(adminPassword)},
-  pdfFile: "pdf/exam.pdf",
+  pdfFile: ${JSON.stringify(defaultPdf)},
+  examSets: ${JSON.stringify(configSets, null, 4)},
   examTitle: ${JSON.stringify(title)},
   institutionName: ${JSON.stringify(institution)},
   restrictions: {
@@ -1114,11 +1194,19 @@ const EXAM_CONFIG = {
 `;
 
       if (isLocalMode) {
-        showStatus('⏳ Saving changes directly to local computer...', 'info');
-        let pdfBase64 = null;
-        if (selectedPdfFile) {
-          showStatus('⏳ Reading PDF file...', 'info');
-          pdfBase64 = await readFileAsBase64(selectedPdfFile);
+        showStatus('⏳ Preparing exam sets for local save...', 'info');
+
+        // Prepare PDF files to send to local server
+        const pdfFilesToUpload = [];
+        for (const set of examSets) {
+          if (set.fileObj && set.isNewUpload) {
+            showStatus(`⏳ Reading ${escapeHtml(set.setName)} PDF...`, 'info');
+            const base64 = await readFileAsBase64(set.fileObj);
+            pdfFilesToUpload.push({
+              filename: set.filePath.split('/').pop(),
+              base64: base64
+            });
+          }
         }
 
         const res = await fetch('/api/save', {
@@ -1126,7 +1214,7 @@ const EXAM_CONFIG = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             configContent: newConfigContent,
-            pdfBase64: pdfBase64
+            pdfFiles: pdfFilesToUpload
           })
         });
 
@@ -1135,27 +1223,44 @@ const EXAM_CONFIG = {
           throw new Error(result.error || `Server responded with HTTP ${res.status}`);
         }
 
+        // Mark all uploaded files as saved
+        examSets.forEach(s => {
+          if (s.isNewUpload) {
+            s.isNewUpload = false;
+            s.fileObj = null;
+            s.sizeStr = 'Saved file';
+          }
+        });
+        renderSetsUI();
+
         showStatus(`
           ✅ <b>Saved successfully to local disk!</b><br/>
-          <code>config.js</code> was updated on your computer (no GitHub token or upload required).<br/>
+          <code>config.js</code> and ${pdfFilesToUpload.length} exam set(s) were saved to your computer.<br/>
           <br/>
           <a href="index.html" target="_blank" style="color:#86efac; font-weight:bold; text-decoration:underline;">
-            👉 Open Exam Viewer to verify changes
+            👉 Open Exam Viewer to test random distribution
           </a>
         `, 'success');
 
       } else {
         // GitHub Pages Mode
         showStatus('⏳ Connecting to GitHub...', 'info');
-        if (selectedPdfFile) {
-          showStatus('⏳ Uploading PDF file to repository...', 'info');
-          const pdfBase64 = await readFileAsBase64(selectedPdfFile);
-          await updateGitHubFile('pdf/exam.pdf', pdfBase64, 'Admin: Update exam PDF file', token);
+
+        for (const set of examSets) {
+          if (set.fileObj && set.isNewUpload) {
+            showStatus(`⏳ Uploading ${escapeHtml(set.setName)} PDF to repository...`, 'info');
+            const pdfBase64 = await readFileAsBase64(set.fileObj);
+            await updateGitHubFile(set.filePath, pdfBase64, `Admin: Update ${set.setName} PDF file`, token);
+            set.isNewUpload = false;
+            set.fileObj = null;
+            s.sizeStr = 'Saved file';
+          }
         }
 
         showStatus('⏳ Updating config.js settings...', 'info');
         const configBase64 = textToBase64(newConfigContent);
-        await updateGitHubFile('config.js', configBase64, 'Admin: Update exam settings and restrictions', token);
+        await updateGitHubFile('config.js', configBase64, 'Admin: Update exam settings and multi-sets', token);
+        renderSetsUI();
 
         showStatus(`
           ✅ <b>Published successfully to GitHub!</b><br/>
@@ -1171,10 +1276,8 @@ const EXAM_CONFIG = {
       sessionStorage.setItem(ADMIN_SESSION_KEY, adminPassword);
       if (typeof EXAM_CONFIG !== 'undefined') {
         EXAM_CONFIG.adminPassword = adminPassword;
+        EXAM_CONFIG.examSets = configSets;
       }
-
-      selectedPdfFile = null;
-      filePreview.style.display = 'none';
 
     } catch (err) {
       console.error(err);

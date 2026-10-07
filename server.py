@@ -24,8 +24,19 @@ class ExamHandler(http.server.SimpleHTTPRequestHandler):
                     with open(config_path, 'w', encoding='utf-8') as f:
                         f.write(data['configContent'])
                 
-                # 2. Save PDF file if uploaded
-                if 'pdfBase64' in data and data['pdfBase64']:
+                # 2. Save PDF file(s) if uploaded
+                if 'pdfFiles' in data and isinstance(data['pdfFiles'], list):
+                    pdf_dir = os.path.join(DIRECTORY, 'pdf')
+                    os.makedirs(pdf_dir, exist_ok=True)
+                    for item in data['pdfFiles']:
+                        if item.get('filename') and item.get('base64'):
+                            # Ensure filename is safe (basename only)
+                            safe_name = os.path.basename(item['filename'])
+                            item_path = os.path.join(pdf_dir, safe_name)
+                            item_bytes = base64.b64decode(item['base64'])
+                            with open(item_path, 'wb') as f:
+                                f.write(item_bytes)
+                elif 'pdfBase64' in data and data['pdfBase64']:
                     pdf_dir = os.path.join(DIRECTORY, 'pdf')
                     os.makedirs(pdf_dir, exist_ok=True)
                     pdf_path = os.path.join(pdf_dir, 'exam.pdf')
