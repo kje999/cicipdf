@@ -4,7 +4,7 @@
  */
 
 const EXAM_CONFIG = {
-  isExamActive: true,
+  isExamActive: false,
   closedMessage: "The practical exam is not yet available. Please wait for your instructor to open the exam.",
   password: "pracbebos",
   pdfFile: "pdf/exam.pdf",
