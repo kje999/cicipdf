@@ -569,15 +569,40 @@ window.addEventListener('keydown', e => {
   }
 });
 
-// Auto-focus password input on load
-setTimeout(() => {
-  const pwd = document.getElementById('pwd-input');
-  if (pwd) pwd.focus();
-}, 100);
+// Check if exam is currently closed / not yet available
+if (EXAM_CONFIG.isExamActive === false) {
+  sessionStorage.removeItem(SESSION_KEY);
+  const formGroup = document.querySelector('.form-group');
+  const btnEnter = document.getElementById('btn-enter');
+  if (formGroup) formGroup.style.display = 'none';
+  if (btnEnter) btnEnter.style.display = 'none';
 
-// Auto-restore session (refresh stays logged in for the session)
-if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
-  showViewer();
+  const closedNotice = document.createElement('div');
+  closedNotice.style.background = 'rgba(239, 68, 68, 0.12)';
+  closedNotice.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+  closedNotice.style.borderRadius = '12px';
+  closedNotice.style.padding = '18px';
+  closedNotice.style.marginTop = '20px';
+  closedNotice.style.color = '#fca5a5';
+  closedNotice.style.fontSize = '0.92rem';
+  closedNotice.style.lineHeight = '1.6';
+  closedNotice.innerHTML = `
+    <div style="font-size:2rem; margin-bottom:8px;">⏳</div>
+    <div style="font-weight:700; font-size:1.05rem; margin-bottom:4px; color:#f87171;">Exam Not Yet Available</div>
+    <div>${EXAM_CONFIG.closedMessage || 'This practical examination is currently closed. Please wait for your instructor to open it.'}</div>
+  `;
+  document.querySelector('.login-card').appendChild(closedNotice);
+} else {
+  // Auto-focus password input on load
+  setTimeout(() => {
+    const pwd = document.getElementById('pwd-input');
+    if (pwd) pwd.focus();
+  }, 100);
+
+  // Auto-restore session (refresh stays logged in for the session)
+  if (sessionStorage.getItem(SESSION_KEY) === 'ok') {
+    showViewer();
+  }
 }
 
 
@@ -659,7 +684,8 @@ async function renderPage(pageNum) {
   await page.render({ canvasContext: ctx, viewport }).promise;
 
   // Stamp watermark on top of the rendered pixels
-  if (EXAM_CONFIG.watermarkText) {
+  const isWatermarkEnabled = (EXAM_CONFIG.restrictions?.enableWatermark !== false);
+  if (isWatermarkEnabled && EXAM_CONFIG.watermarkText) {
     applyWatermark(ctx, viewport.width, viewport.height);
   }
 
@@ -749,35 +775,50 @@ function setupScrollObserver() {
    SECURITY MEASURES
 ══════════════════════════════════════ */
 function setupSecurity() {
+  const r = EXAM_CONFIG.restrictions || {};
 
-  // 1. Block right-click context menu
-  document.addEventListener('contextmenu', e => e.preventDefault());
+  // 1. Text Selection
+  if (r.blockTextSelection !== false) {
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+  } else {
+    document.body.style.userSelect = 'text';
+    document.body.style.webkitUserSelect = 'text';
+  }
 
-  // 2. Block clipboard events
-  document.addEventListener('copy',  e => e.preventDefault());
-  document.addEventListener('cut',   e => e.preventDefault());
-  document.addEventListener('paste', e => e.preventDefault());
+  // 2. Block right-click context menu
+  if (r.blockRightClick !== false) {
+    document.addEventListener('contextmenu', e => e.preventDefault());
+  }
 
-  // 3. Block drag-and-drop (can expose canvas content)
-  document.addEventListener('dragstart', e => e.preventDefault());
+  // 3. Block clipboard events & dragging
+  if (r.blockCopy !== false) {
+    document.addEventListener('copy',  e => e.preventDefault());
+    document.addEventListener('cut',   e => e.preventDefault());
+    document.addEventListener('paste', e => e.preventDefault());
+    document.addEventListener('dragstart', e => e.preventDefault());
+  }
 
   // 4. Block keyboard shortcuts
-  document.addEventListener('keydown', e => {
-    const ctrl = e.ctrlKey || e.metaKey;
+  if (r.blockShortcuts !== false) {
+    document.addEventListener('keydown', e => {
+      const ctrl = e.ctrlKey || e.metaKey;
 
-    const blockedCtrl = ['c','x','u','a','p','s'].includes(e.key.toLowerCase());
-    const devtools    = e.key === 'F12' ||
-                        (ctrl && e.shiftKey && ['i','j','c','k'].includes(e.key.toLowerCase()));
-    const printScreen = e.key === 'PrintScreen';
+      const blockedCtrl = ['c','x','u','a','p','s'].includes(e.key.toLowerCase());
+      const devtools    = e.key === 'F12' ||
+                          (ctrl && e.shiftKey && ['i','j','c','k'].includes(e.key.toLowerCase()));
+      const printScreen = e.key === 'PrintScreen';
 
-    if ((ctrl && blockedCtrl) || devtools || printScreen) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, true);
+      if ((ctrl && blockedCtrl) || devtools || printScreen) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  }
 
   // 5. Tab / window-switch detection
-  if (EXAM_CONFIG.detectTabSwitch) {
+  const tabSwitchEnabled = r.detectTabSwitch !== undefined ? r.detectTabSwitch : EXAM_CONFIG.detectTabSwitch;
+  if (tabSwitchEnabled !== false) {
     let switchCount = 0;
 
     function triggerWarning() {
