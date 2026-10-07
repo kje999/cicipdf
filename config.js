@@ -12,7 +12,7 @@ const EXAM_CONFIG = {
   // ── 🔑 ACCESS PASSWORD ────────────────────────────────────────────────────
   //  Students must type this to unlock the exam viewer.
   //  Change this before every exam session, then re-upload config.js.
-  password: "exam2024",
+  password: "pracbibi",
 
   // ── 📄 PDF FILE ───────────────────────────────────────────────────────────
   //  Path to your PDF inside the project folder.
@@ -24,8 +24,8 @@ const EXAM_CONFIG = {
 
   // ── 🏫 BRANDING ───────────────────────────────────────────────────────────
   //  Shown on the login screen and the viewer toolbar.
-  examTitle:       "Practical Examination",
-  institutionName: "Your School / Department",
+  examTitle:       "Web Systems Technology - Practical Exam",
+  institutionName: "ISUFST",
 
   // ── 💧 WATERMARK ──────────────────────────────────────────────────────────
   //  Text stamped diagonally across every rendered page.
