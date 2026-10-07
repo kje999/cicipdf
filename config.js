@@ -11,7 +11,7 @@ const EXAM_CONFIG = {
   pdfFile: "pdf/exam_set_a.pdf",
   examSets: [
     {
-        "id": "set_a",
+        "id": "set_c",
         "setName": "Set A",
         "filePath": "pdf/exam_set_a.pdf"
     },
