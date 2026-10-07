@@ -385,22 +385,48 @@
     </a>
   </div>
 
-  <!-- 1. GitHub Connection Card -->
-  <div class="card">
-    <div class="card-title">🔑 1. GitHub Authorization</div>
+  <!-- 1. Destination Mode & GitHub Connection Card -->
+  <div class="card" id="card-destination">
+    <div class="card-title">⚙️ 1. Publishing Destination</div>
     <div class="card-desc">
-      To publish updates directly to your site, provide your GitHub Personal Access Token. It is saved <b>only in your browser</b> (never stored publicly).
+      Choose where to apply changes: directly to your local computer disk, or publish to GitHub Pages.
     </div>
 
-    <div class="form-group">
-      <label class="form-label">GitHub Personal Access Token (classic or fine-grained)</label>
-      <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
-      <div class="token-help">
-        Don't have one yet?
-        <a href="https://github.com/settings/tokens/new?scopes=repo&description=ExamViewerDashboard" target="_blank">
-          👉 Click here to create a token with 'repo' scope
-        </a>.
-        Generate the token, copy it, and paste it here. You only need to do this once!
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+      <label id="label-mode-local" style="display:flex; align-items:center; gap:10px; padding:12px; border-radius:10px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.35); cursor:pointer;">
+        <input type="radio" name="publish-mode" id="mode-local" value="local" checked />
+        <div>
+          <div style="font-weight:700; color:#6ee7b7; font-size:0.9rem;">🖥️ Localhost Mode</div>
+          <div style="font-size:0.75rem; color:#94a3b8;">Direct save to disk. No token needed.</div>
+        </div>
+      </label>
+
+      <label id="label-mode-github" style="display:flex; align-items:center; gap:10px; padding:12px; border-radius:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); cursor:pointer;">
+        <input type="radio" name="publish-mode" id="mode-github" value="github" />
+        <div>
+          <div style="font-weight:700; color:#cbd5e1; font-size:0.9rem;">☁️ GitHub Pages Mode</div>
+          <div style="font-size:0.75rem; color:#94a3b8;">Sync to remote repository via Token.</div>
+        </div>
+      </label>
+    </div>
+
+    <!-- Local Mode Info Box -->
+    <div id="local-info-box" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); border-radius:8px; padding:12px; font-size:0.83rem; color:#a7f3d0; line-height:1.5;">
+      🟢 <b>Local Mode Active:</b> Changes will save directly to <code>config.js</code> (and <code>pdf/exam.pdf</code>) on your computer. GitHub Authorization is disabled and not required.
+    </div>
+
+    <!-- GitHub Token Section -->
+    <div id="github-token-section" style="display:none; margin-top:14px; border-top:1px solid rgba(255,255,255,0.08); padding-top:14px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">GitHub Personal Access Token (classic or fine-grained)</label>
+        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+        <div class="token-help">
+          Don't have one yet?
+          <a href="https://github.com/settings/tokens/new?scopes=repo&description=ExamViewerDashboard" target="_blank">
+            👉 Click here to create a token with 'repo' scope
+          </a>.
+          Generate the token, copy it, and paste it here.
+        </div>
       </div>
     </div>
   </div>
@@ -501,8 +527,8 @@
     <!-- Toggle 4: Shortcuts -->
     <div class="restriction-item">
       <div class="restriction-info">
-        <div class="restriction-title">⌨️ Block Keyboard Shortcuts</div>
-        <div class="restriction-sub">Disables Print (Ctrl+P), Save (Ctrl+S), DevTools (F12, Ctrl+Shift+I), View Source (Ctrl+U).</div>
+        <div class="restriction-title">⌨️ Block Keyboard Shortcuts, PrintScreen & Snipping Tool</div>
+        <div class="restriction-sub">Disables PrintScreen, Snipping Tool (Win+Shift+S), Browser Capture (Ctrl+Shift+S), Print (Ctrl+P), Save (Ctrl+S), DevTools (F12, Ctrl+Shift+I), View Source (Ctrl+U).</div>
       </div>
       <label class="switch">
         <input type="checkbox" id="res-shortcuts" checked />
@@ -545,6 +571,7 @@
         <span class="slider"></span>
       </label>
     </div>
+
 
     <div class="form-group" id="group-watermark-text" style="margin-top:14px;">
       <label class="form-label">Watermark Text</label>
@@ -596,7 +623,14 @@
   const REPO_OWNER = 'kje999';
   const REPO_NAME  = 'cicipdf';
 
-  // UI elements
+  // UI elements & Destination Mode
+  const modeLocal         = document.getElementById('mode-local');
+  const modeGithub        = document.getElementById('mode-github');
+  const labelModeLocal    = document.getElementById('label-mode-local');
+  const labelModeGithub   = document.getElementById('label-mode-github');
+  const localInfoBox      = document.getElementById('local-info-box');
+  const githubTokenSec    = document.getElementById('github-token-section');
+
   const tokenInput        = document.getElementById('gh-token');
   const activeInput       = document.getElementById('cfg-active');
   const closedMsgInput    = document.getElementById('cfg-closed-msg');
@@ -661,6 +695,40 @@
   resWatermark.addEventListener('change', () => {
     groupWatermark.style.display = resWatermark.checked ? 'block' : 'none';
   });
+
+  // Toggle Destination Mode (Local vs GitHub)
+  function updateModeUI() {
+    const isLocal = modeLocal.checked;
+    if (isLocal) {
+      localInfoBox.style.display = 'block';
+      githubTokenSec.style.display = 'none';
+      labelModeLocal.style.background = 'rgba(16,185,129,0.1)';
+      labelModeLocal.style.borderColor = 'rgba(16,185,129,0.35)';
+      labelModeGithub.style.background = 'rgba(255,255,255,0.04)';
+      labelModeGithub.style.borderColor = 'rgba(255,255,255,0.1)';
+      btnSave.querySelector('span').textContent = '💾 Save & Apply Changes Locally';
+    } else {
+      localInfoBox.style.display = 'none';
+      githubTokenSec.style.display = 'block';
+      labelModeLocal.style.background = 'rgba(255,255,255,0.04)';
+      labelModeLocal.style.borderColor = 'rgba(255,255,255,0.1)';
+      labelModeGithub.style.background = 'rgba(139,92,246,0.1)';
+      labelModeGithub.style.borderColor = 'rgba(139,92,246,0.35)';
+      btnSave.querySelector('span').textContent = '🚀 Publish Changes to GitHub';
+    }
+  }
+
+  modeLocal.addEventListener('change', updateModeUI);
+  modeGithub.addEventListener('change', updateModeUI);
+
+  // Auto-detect environment
+  const isRunningLocally = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:');
+  if (isRunningLocally) {
+    modeLocal.checked = true;
+  } else {
+    modeGithub.checked = true;
+  }
+  updateModeUI();
 
   // 1. Pre-fill from localStorage & current config.js
   const savedToken = localStorage.getItem('exam_admin_token') || '';
@@ -809,8 +877,10 @@
 
   // 6. Save & Publish Action
   btnSave.addEventListener('click', async () => {
+    const isLocalMode = modeLocal.checked;
     const token = tokenInput.value.trim();
-    if (!token) {
+
+    if (!isLocalMode && !token) {
       showStatus('⚠️ Please enter your GitHub Personal Access Token first.', 'error');
       tokenInput.focus();
       return;
@@ -840,23 +910,14 @@
       return;
     }
 
-    // Save token in browser storage
-    localStorage.setItem('exam_admin_token', token);
+    if (!isLocalMode) {
+      // Save token in browser storage
+      localStorage.setItem('exam_admin_token', token);
+    }
 
     btnSave.disabled = true;
-    showStatus('⏳ Connecting to GitHub...', 'info');
 
     try {
-      // Step A: Upload PDF if a new one was selected
-      if (selectedPdfFile) {
-        showStatus('⏳ Uploading PDF file to repository...', 'info');
-        const pdfBase64 = await readFileAsBase64(selectedPdfFile);
-        await updateGitHubFile('pdf/exam.pdf', pdfBase64, 'Admin: Update exam PDF file', token);
-      }
-
-      // Step B: Generate new config.js code
-      showStatus('⏳ Updating config.js settings...', 'info');
-
       const newConfigContent = `/**
  * EXAM VIEWER — CONFIGURATION FILE
  * Auto-updated via Admin Dashboard
@@ -882,25 +943,66 @@ const EXAM_CONFIG = {
 };
 `;
 
-      const configBase64 = textToBase64(newConfigContent);
-      await updateGitHubFile('config.js', configBase64, 'Admin: Update exam settings and restrictions', token);
+      if (isLocalMode) {
+        showStatus('⏳ Saving changes directly to local computer...', 'info');
+        let pdfBase64 = null;
+        if (selectedPdfFile) {
+          showStatus('⏳ Reading PDF file...', 'info');
+          pdfBase64 = await readFileAsBase64(selectedPdfFile);
+        }
 
-      // Success!
-      showStatus(`
-        ✅ <b>Published successfully!</b><br/>
-        GitHub Pages is now rebuilding your site. Your changes will be active in about <b>30–60 seconds</b>.<br/>
-        <br/>
-        <a href="index.html" target="_blank" style="color:#86efac; font-weight:bold; text-decoration:underline;">
-          👉 Click here to test your updated exam
-        </a>
-      `, 'success');
+        const res = await fetch('/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            configContent: newConfigContent,
+            pdfBase64: pdfBase64
+          })
+        });
+
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || !result.success) {
+          throw new Error(result.error || `Server responded with HTTP ${res.status}`);
+        }
+
+        showStatus(`
+          ✅ <b>Saved successfully to local disk!</b><br/>
+          <code>config.js</code> was updated on your computer (no GitHub token or upload required).<br/>
+          <br/>
+          <a href="index.html" target="_blank" style="color:#86efac; font-weight:bold; text-decoration:underline;">
+            👉 Open Exam Viewer to verify changes
+          </a>
+        `, 'success');
+
+      } else {
+        // GitHub Pages Mode
+        showStatus('⏳ Connecting to GitHub...', 'info');
+        if (selectedPdfFile) {
+          showStatus('⏳ Uploading PDF file to repository...', 'info');
+          const pdfBase64 = await readFileAsBase64(selectedPdfFile);
+          await updateGitHubFile('pdf/exam.pdf', pdfBase64, 'Admin: Update exam PDF file', token);
+        }
+
+        showStatus('⏳ Updating config.js settings...', 'info');
+        const configBase64 = textToBase64(newConfigContent);
+        await updateGitHubFile('config.js', configBase64, 'Admin: Update exam settings and restrictions', token);
+
+        showStatus(`
+          ✅ <b>Published successfully to GitHub!</b><br/>
+          GitHub Pages is now rebuilding your site. Your changes will be active in about <b>30–60 seconds</b>.<br/>
+          <br/>
+          <a href="index.html" target="_blank" style="color:#86efac; font-weight:bold; text-decoration:underline;">
+            👉 Click here to test your updated exam
+          </a>
+        `, 'success');
+      }
 
       selectedPdfFile = null;
       filePreview.style.display = 'none';
 
     } catch (err) {
       console.error(err);
-      showStatus(`❌ <b>Error:</b> ${err.message}<br/><small>Check that your token is valid and has "repo" permissions.</small>`, 'error');
+      showStatus(`❌ <b>Error:</b> ${err.message}`, 'error');
     } finally {
       btnSave.disabled = false;
     }

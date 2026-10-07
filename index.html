@@ -20,6 +20,7 @@
       user-select: none;
       -webkit-user-select: none;
       -moz-user-select: none;
+      -webkit-touch-callout: none;
     }
 
     /* ── PRINT BLOCK ──────────────────────────────────────────────────────── */
@@ -399,28 +400,27 @@
 
     #btn-resume:hover { opacity: 0.88; }
 
-    /* ── ANTI-SCREENSHOT MOUSE-LEAVE BLUR ────────────────────────── */
+    /* ── ANTI-SCREENSHOT MOUSE-LEAVE BLUR & OVERLAY ──────────────── */
     #pdf-container.security-blurred {
       filter: blur(28px) grayscale(60%);
       opacity: 0.12;
       pointer-events: none;
-      transition: filter 0.08s ease, opacity 0.08s ease;
     }
 
     #blur-notice {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(14, 14, 26, 0.92);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      background: rgba(17, 17, 27, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
       z-index: 9998;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 16px;
       text-align: center;
       padding: 32px;
-      gap: 14px;
       pointer-events: none;
     }
 
@@ -727,15 +727,51 @@ let currentPage = 1;
 // Render at high DPI for crispness; 1.8× is a good balance of quality vs. speed
 const RENDER_SCALE = window.devicePixelRatio >= 2 ? 2.0 : 1.8;
 
-async function loadPDF() {
+async function loadPDF(retryCount = 0) {
+  const container = document.getElementById('pdf-container');
+  // Ensure loading overlay is present
+  let overlay = document.getElementById('loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.innerHTML = `
+      <div class="spinner"></div>
+      <span>Loading exam, please wait…</span>
+    `;
+    container.prepend(overlay);
+  } else {
+    overlay.innerHTML = `
+      <div class="spinner"></div>
+      <span>Loading exam, please wait…</span>
+    `;
+  }
+
   try {
-    const loadingTask = pdfjsLib.getDocument(EXAM_CONFIG.pdfFile);
+    // 1. Ensure PDF.js is ready
+    if (typeof pdfjsLib === 'undefined') {
+      throw new Error('PDF viewer library is still loading. Please check your internet connection.');
+    }
+
+    // 2. Cache-busting URL to prevent browser 304/stale partial cache issues
+    const pdfUrl = EXAM_CONFIG.pdfFile + (EXAM_CONFIG.pdfFile.includes('?') ? '&' : '?') + '_t=' + Date.now();
+
+    const loadingTask = pdfjsLib.getDocument({
+      url: pdfUrl,
+      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+      cMapPacked: true,
+      disableRange: true, // Prevents HTTP 206 partial content bugs on local/simple servers
+      disableStream: true
+    });
+
     pdfDoc      = await loadingTask.promise;
     totalPages  = pdfDoc.numPages;
     currentPage = 1;
 
+    // Clear any previous rendered pages if reloaded
+    const oldPages = container.querySelectorAll('.page-wrapper');
+    oldPages.forEach(p => p.remove());
+
     // Remove the spinner
-    const overlay = document.getElementById('loading-overlay');
     if (overlay) overlay.remove();
 
     // Render pages progressively (page 1 first, then the rest)
@@ -750,16 +786,41 @@ async function loadPDF() {
     setupScrollObserver();
 
   } catch (err) {
-    const overlay = document.getElementById('loading-overlay');
+    console.error('PDF load error:', err);
+
+    // Auto-retry up to 2 times with a slight delay
+    if (retryCount < 2) {
+      console.warn(`Retrying PDF load (attempt ${retryCount + 1}/2)...`);
+      await new Promise(r => setTimeout(r, 800));
+      return loadPDF(retryCount + 1);
+    }
+
     if (overlay) {
       overlay.innerHTML = `
-        <span style="font-size:2rem;">⚠️</span>
-        <span style="color:#f38ba8; font-size:0.95rem;">
-          Failed to load the exam file.<br/>
-          Please contact your instructor.
-        </span>`;
+        <span style="font-size:2.2rem;">⚠️</span>
+        <span style="color:#f38ba8; font-size:1rem; font-weight:700;">
+          Failed to load the exam file
+        </span>
+        <span style="color:rgba(205, 214, 244, 0.6); font-size:0.85rem; max-width:360px; line-height:1.4;">
+          ${err.message || 'The exam document could not be retrieved from the server.'}
+        </span>
+        <button id="btn-retry-pdf" style="
+          margin-top: 10px;
+          padding: 8px 24px;
+          background: #cba6f7;
+          border: none;
+          border-radius: 8px;
+          color: #11111b;
+          font-weight: 700;
+          cursor: pointer;
+          font-size: 0.9rem;
+        ">🔄 Try Again</button>
+      `;
+      const retryBtn = document.getElementById('btn-retry-pdf');
+      if (retryBtn) {
+        retryBtn.onclick = () => loadPDF(0);
+      }
     }
-    console.error('PDF load error:', err);
   }
 }
 
@@ -793,10 +854,14 @@ async function renderPage(pageNum) {
 }
 
 function applyWatermark(ctx, w, h) {
-  const fontSize = Math.round(w / 10);
+  const fontSize = Math.round(w / 14);
+  const markText = EXAM_CONFIG.watermarkText || 'CONFIDENTIAL EXAM — DO NOT CAPTURE';
+
   ctx.save();
-  ctx.globalAlpha     = 0.07;
-  ctx.fillStyle       = '#cc0000';
+
+  // Diagonal repeated watermark across whole page
+  ctx.globalAlpha     = 0.22;
+  ctx.fillStyle       = '#dc2626';
   ctx.font            = `bold ${fontSize}px sans-serif`;
   ctx.textAlign       = 'center';
   ctx.textBaseline    = 'middle';
@@ -804,10 +869,20 @@ function applyWatermark(ctx, w, h) {
   ctx.translate(w / 2, h / 2);
   ctx.rotate(-Math.PI / 6); // 30° diagonal
 
-  const lineHeight = fontSize * 2.4;
+  const lineHeight = fontSize * 2.8;
   for (let y = -h * 1.5; y < h * 1.5; y += lineHeight) {
-    ctx.fillText(EXAM_CONFIG.watermarkText, 0, y);
+    ctx.fillText(markText, 0, y);
   }
+  ctx.restore();
+
+  // Distinct security warning banner stamped at the top and bottom of each canvas
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle   = '#dc2626';
+  ctx.font        = `bold ${Math.round(w / 35)}px sans-serif`;
+  ctx.textAlign   = 'center';
+  ctx.fillText(`🔒 SECURED EXAM SESSION — UNAUTHORIZED SCREEN CAPTURE IS PROHIBITED & LOGGED`, w / 2, 28);
+  ctx.fillText(`🔒 SECURED EXAM SESSION — UNAUTHORIZED SCREEN CAPTURE IS PROHIBITED & LOGGED`, w / 2, h - 16);
   ctx.restore();
 }
 
@@ -898,40 +973,111 @@ function setupSecurity() {
     document.addEventListener('dragstart', e => e.preventDefault());
   }
 
-  // 4. Block keyboard shortcuts
+  let securityIncidentCount = 0;
+  let isOverlayActive       = false;
+
+  function showSecurityOverlay(reason) {
+    // 1. Overwrite clipboard immediately
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText('⚠️ Screenshots are strictly prohibited during this examination.').catch(() => {});
+    }
+
+    // If overlay is already visibly active, don't duplicate the incident count
+    if (isOverlayActive) return;
+    isOverlayActive = true;
+
+    securityIncidentCount++;
+    const counterEl = document.getElementById('switch-counter');
+    if (counterEl) {
+      counterEl.textContent = `Security incidents this session: ${securityIncidentCount}`;
+    }
+
+    const titleEl = document.querySelector('#tab-warning .warning-title');
+    const msgEl   = document.querySelector('#tab-warning .warning-msg');
+
+    if (reason === 'screenshot') {
+      if (titleEl) titleEl.textContent = 'Screenshot / Snip Attempt Blocked';
+      if (msgEl) msgEl.innerHTML = 'Screen capture and snipping utilities are strictly prohibited.<br/>This incident has been logged.';
+    } else {
+      if (titleEl) titleEl.textContent = 'Window Inactive / Tab Switched';
+      if (msgEl) msgEl.innerHTML = 'You navigated away from the exam or opened an external overlay.<br/>Stay on this page for the duration of your exam.';
+    }
+
+    document.getElementById('tab-warning').classList.add('active');
+  }
+
+  // 4. Block keyboard shortcuts & Anti-Screenshot / Snipping Protection
   if (r.blockShortcuts !== false) {
     document.addEventListener('keydown', e => {
-      const ctrl = e.ctrlKey || e.metaKey;
+      const keyLower = (e.key || '').toLowerCase();
+      const code     = e.code || '';
+      const ctrl     = e.ctrlKey || e.metaKey;
 
-      const blockedCtrl = ['c','x','u','a','p','s'].includes(e.key.toLowerCase());
+      // Detect all OS and browser screenshot / snipping shortcuts immediately on keydown
+      const isPrtScn    = e.key === 'PrintScreen' || code === 'PrintScreen' || e.keyCode === 44;
+      const isWinSnip   = (keyLower === 's' || code === 'KeyS') && e.shiftKey && (e.metaKey || e.ctrlKey); // Win+Shift+S (Snipping Tool) or Ctrl+Shift+S (Browser Capture)
+      const isMetaShift = (e.key === 'Meta' || code === 'MetaLeft' || code === 'MetaRight' || e.metaKey) && e.shiftKey;
+      const isAltPrtScn = isPrtScn && e.altKey;
+      const isWinPrtScn = isPrtScn && (e.metaKey || e.ctrlKey);
+      const isGameBar   = (keyLower === 'g' || code === 'KeyG') && (e.metaKey || e.ctrlKey); // Win+G (Game Bar capture)
+
+      if (isPrtScn || isWinSnip || isMetaShift || isAltPrtScn || isWinPrtScn || isGameBar) {
+        // Instantly blur / obscure PDF container with zero delay
+        const pdfCont = document.getElementById('pdf-container');
+        if (pdfCont) pdfCont.classList.add('security-blurred');
+        showSecurityOverlay('screenshot');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // Block Developer Tools, Printing (Ctrl+P), Saving (Ctrl+S), View Source (Ctrl+U), Copy/Cut
+      const blockedCtrl = ['c','x','u','a','p','s'].includes(keyLower);
       const devtools    = e.key === 'F12' ||
-                          (ctrl && e.shiftKey && ['i','j','c','k'].includes(e.key.toLowerCase()));
-      const printScreen = e.key === 'PrintScreen';
+                          (ctrl && e.shiftKey && ['i','j','c','k'].includes(keyLower));
 
-      if ((ctrl && blockedCtrl) || devtools || printScreen) {
+      if ((ctrl && blockedCtrl) || devtools) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+
+    // Also catch keyup (some Windows keyboards fire PrintScreen on release)
+    document.addEventListener('keyup', e => {
+      const code = e.code || '';
+      if (e.key === 'PrintScreen' || code === 'PrintScreen' || e.keyCode === 44) {
+        const pdfCont = document.getElementById('pdf-container');
+        if (pdfCont) pdfCont.classList.add('security-blurred');
+        showSecurityOverlay('screenshot');
         e.preventDefault();
         e.stopPropagation();
       }
     }, true);
   }
 
-  // 5. Tab / window-switch detection
+  // 5. Tab / window-switch & Snipping Tool blur detection
   const tabSwitchEnabled = r.detectTabSwitch !== undefined ? r.detectTabSwitch : EXAM_CONFIG.detectTabSwitch;
   if (tabSwitchEnabled !== false) {
-    let switchCount = 0;
-
-    function triggerWarning() {
-      switchCount++;
-      document.getElementById('switch-counter').textContent =
-        `Tab/window switch count this session: ${switchCount}`;
-      document.getElementById('tab-warning').classList.add('active');
-    }
-
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) triggerWarning();
+      if (document.hidden) {
+        const pdfCont = document.getElementById('pdf-container');
+        if (pdfCont) pdfCont.classList.add('security-blurred');
+        showSecurityOverlay('blur');
+      }
     });
 
-    window.addEventListener('blur', triggerWarning);
+    window.addEventListener('blur', () => {
+      const pdfCont = document.getElementById('pdf-container');
+      if (pdfCont) pdfCont.classList.add('security-blurred');
+      showSecurityOverlay('blur');
+    });
+
+    // Overwrite clipboard when returning to exam
+    window.addEventListener('focus', () => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText('⚠️ Screenshots are strictly prohibited during this examination.').catch(() => {});
+      }
+    });
   }
 
   // 6. Anti-Screenshot: Blur on Mouse Leave
@@ -952,13 +1098,23 @@ function setupSecurity() {
       if (blurNotice) blurNotice.classList.remove('active');
     });
   }
-}
 
-// Resume from tab-switch overlay
-document.getElementById('btn-resume').addEventListener('click', () => {
-  document.getElementById('tab-warning').classList.remove('active');
-  window.focus();
-});
+  // 7. Tab switch alert cleanup on resume
+  const resumeBtn = document.getElementById('btn-resume');
+  if (resumeBtn) {
+    resumeBtn.onclick = (e) => {
+      e.stopPropagation();
+      isOverlayActive = false;
+      document.getElementById('tab-warning').classList.remove('active');
+      const blurNotice = document.getElementById('blur-notice');
+      if (blurNotice) blurNotice.classList.remove('active');
+      const pdfCont = document.getElementById('pdf-container');
+      if (pdfCont) {
+        pdfCont.classList.remove('security-blurred');
+      }
+    };
+  }
+}
 </script>
 </body>
 </html>
