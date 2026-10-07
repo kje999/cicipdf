@@ -9,6 +9,7 @@ const EXAM_CONFIG = {
   password: "prac2026",
   adminPassword: "tubol69",
   pdfFile: "pdf/exam_set_a.pdf",
+  showSetBadge: false,
   examSets: [
     {
         "id": "set_c",

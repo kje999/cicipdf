@@ -696,6 +696,18 @@
       💡 <b>Random Device-Locked Distribution:</b> When multiple sets are added, students entering the password are automatically and randomly assigned a set. Their assignment is locked into their browser so <b>even if they accidentally close or refresh the browser, they will always receive the exact same question set</b>.
     </div>
 
+    <!-- Toggle: Show/Hide Set Badge in Student View -->
+    <div class="restriction-item" style="margin-top:14px; background:rgba(255,255,255,0.02); padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.06);">
+      <div class="restriction-info">
+        <div class="restriction-title">🏷️ Show Set Badge in Student Header</div>
+        <div class="restriction-sub">When disabled, students will NOT see which set (e.g., "Set A", "Set B") they are taking in the top toolbar. Keeps sets confidential to prevent comparison.</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="cfg-show-set-badge" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
     <!-- Dynamic Sets Container -->
     <div id="sets-list-container" style="margin-top:16px; display:flex; flex-direction:column; gap:12px;"></div>
   </div>
@@ -742,6 +754,7 @@
   const institutionInput   = document.getElementById('cfg-institution');
   const watermarkInput     = document.getElementById('cfg-watermark');
   const groupWatermark     = document.getElementById('group-watermark-text');
+  const showSetBadgeInput  = document.getElementById('cfg-show-set-badge');
 
   // Admin Auth Gate elements
   const adminGateScreen = document.getElementById('admin-gate-screen');
@@ -1022,9 +1035,13 @@
     resMouseBlur.checked   = r.blurOnMouseLeave !== false;
     resWatermark.checked   = r.enableWatermark !== false;
     groupWatermark.style.display = resWatermark.checked ? 'block' : 'none';
+    if (showSetBadgeInput) {
+      showSetBadgeInput.checked = (EXAM_CONFIG.showSetBadge === true);
+    }
     initExamSetsFromConfig();
   } else {
     updateStatusDisplay(true);
+    if (showSetBadgeInput) showSetBadgeInput.checked = false;
     initExamSetsFromConfig();
   }
 
@@ -1118,6 +1135,7 @@
     const title         = titleInput.value.trim() || 'Practical Examination';
     const institution   = institutionInput.value.trim() || '';
     const watermark     = watermarkInput.value.trim();
+    const showSetBadge  = showSetBadgeInput ? showSetBadgeInput.checked : false;
 
     // Restrictions
     const restrictions = {
@@ -1177,6 +1195,7 @@ const EXAM_CONFIG = {
   password: ${JSON.stringify(password)},
   adminPassword: ${JSON.stringify(adminPassword)},
   pdfFile: ${JSON.stringify(defaultPdf)},
+  showSetBadge: ${showSetBadge},
   examSets: ${JSON.stringify(configSets, null, 4)},
   examTitle: ${JSON.stringify(title)},
   institutionName: ${JSON.stringify(institution)},

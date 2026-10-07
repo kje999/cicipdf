@@ -792,11 +792,12 @@ async function loadPDF(retryCount = 0) {
     const pdfPath  = assigned.filePath;
     const pdfUrl   = pdfPath + (pdfPath.includes('?') ? '&' : '?') + '_t=' + Date.now();
 
-    // Update set badge in toolbar if multi-set is active
+    // Update set badge in toolbar if multi-set is active and not hidden by instructor
     const setBadge = document.getElementById('set-badge');
     const setBadgeLabel = document.getElementById('set-badge-label');
+    const shouldShowBadge = (typeof EXAM_CONFIG !== 'undefined' && EXAM_CONFIG.showSetBadge === true);
     if (setBadge && setBadgeLabel) {
-      if (assigned.setName) {
+      if (assigned.setName && shouldShowBadge) {
         setBadgeLabel.textContent = assigned.setName;
         setBadge.style.display = 'block';
       } else {
