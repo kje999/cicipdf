@@ -20,11 +20,6 @@ const EXAM_CONFIG = {
         "id": "set_b",
         "setName": "Set B",
         "filePath": "pdf/exam_set_b.pdf"
-    },
-    {
-        "id": "set_c",
-        "setName": "Set C",
-        "filePath": "pdf/exam_set_c.pdf"
     }
 ],
   examTitle: "Web Systems Technology - Practical Exam",
