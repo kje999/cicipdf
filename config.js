@@ -4,30 +4,25 @@
  */
 
 const EXAM_CONFIG = {
-  isExamActive: true,
+  isExamActive: false,
   closedMessage: "The practical exam is not yet available. Please wait for your instructor to open the exam.",
-  password: "prac2026",
+  password: "cici2026",
   adminPassword: "tubol69",
   pdfFile: "pdf/exam_set_a.pdf",
   showSetBadge: false,
   examSets: [
     {
-        "id": "set_c",
+        "id": "set_b",
         "setName": "Set A",
         "filePath": "pdf/exam_set_a.pdf"
     },
     {
         "id": "set_b",
-        "setName": "Set B",
-        "filePath": "pdf/exam_set_b.pdf"
-    },
-    {
-        "id": "set_c",
         "setName": "Set C",
-        "filePath": "pdf/exam_set_c.pdf"
+        "filePath": "pdf/exam_set_b.pdf"
     }
 ],
-  examTitle: "Web Systems Technology - Practical Exam",
+  examTitle: "OOP - Practical Exam",
   institutionName: "ISUFST",
   restrictions: {
     blockRightClick:    true,
