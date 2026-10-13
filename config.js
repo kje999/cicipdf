@@ -8,14 +8,9 @@ const EXAM_CONFIG = {
   closedMessage: "The practical exam is not yet available. Please wait for your instructor to open the exam.",
   password: "cici2026",
   adminPassword: "tubol69",
-  pdfFile: "pdf/exam_set_a.pdf",
+  pdfFile: "pdf/exam_set_b.pdf",
   showSetBadge: false,
   examSets: [
-    {
-        "id": "set_b",
-        "setName": "Set A",
-        "filePath": "pdf/exam_set_a.pdf"
-    },
     {
         "id": "set_b",
         "setName": "Set C",
