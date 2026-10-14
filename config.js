@@ -4,7 +4,7 @@
  */
 
 const EXAM_CONFIG = {
-  isExamActive: false,
+  isExamActive: true,
   closedMessage: "The practical exam is not yet available. Please wait for your instructor to open the exam.",
   password: "dikalab123",
   adminPassword: "tubol69",
@@ -22,7 +22,7 @@ const EXAM_CONFIG = {
         "filePath": "pdf/exam_set_b.pdf"
     }
 ],
-  examTitle: "Network Programming",
+  examTitle: "Web Systems Technology - Practical Exam",
   institutionName: "ISUFST",
   restrictions: {
     blockRightClick:    true,
