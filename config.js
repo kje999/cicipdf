@@ -27,7 +27,7 @@ const EXAM_CONFIG = {
         "filePath": "pdf/exam_set_c.pdf"
     }
 ],
-  examTitle: "OOP - Practical Exam",
+  examTitle: "Network Programming",
   institutionName: "ISUFST",
   restrictions: {
     blockRightClick:    true,
